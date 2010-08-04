@@ -3,7 +3,7 @@ Convenient shortcuts to manage or check object permissions.
 """
 from django.db import models
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Permission, User
 
 from guardian.core import ObjectPermissionChecker
 from guardian.models import UserObjectPermission, GroupObjectPermission
@@ -82,4 +82,29 @@ def get_perms_for_model(cls):
         model = cls
     ctype = ContentType.objects.get_for_model(model)
     return Permission.objects.filter(content_type=ctype)
+
+
+def get_objs(cls, perm, user_or_group):
+    """
+    Returns all objects from the given class which have the passed permission
+    and user assigned to it.
+    """
+    pass
+
+
+def get_users_with_perm(obj, codename):
+    ctype = ContentType.objects.get_for_model(obj)
+    group_perm_list = GroupObjectPermission.objects.filter(permission__codename=codename,
+                                                           content_type=ctype,
+                                                           object_id=obj.pk)
+    group_list = [group_perm.group for group_perm in group_perm_list]
+    user_perm_list = UserObjectPermission.objects.filter(permission__codename=codename,
+                                                         content_type=ctype,
+                                                         object_id=obj.pk)
+    user_list = [user_perm.user for user_perm in user_perm_list]
+    user_list2 = [user for user in User.objects.filter(groups__in=group_list)]
+
+    print User.objects.filter(groups__in=group_list)
+    print user_list
+    print set(user_list2 + user_list)
 
