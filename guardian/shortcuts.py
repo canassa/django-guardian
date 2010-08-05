@@ -104,7 +104,5 @@ def get_users_with_perm(obj, codename):
     user_list = [user_perm.user for user_perm in user_perm_list]
     user_list2 = [user for user in User.objects.filter(groups__in=group_list)]
 
-    print User.objects.filter(groups__in=group_list)
-    print user_list
-    print set(user_list2 + user_list)
+    return set(user_list2 + user_list)
 
