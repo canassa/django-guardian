@@ -3,7 +3,6 @@ from itertools import chain
 from django.test import TestCase
 from django.contrib.auth.models import User, Group, Permission, AnonymousUser
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.flatpages.models import FlatPage
 
 from guardian.core import ObjectPermissionChecker
 from guardian.models import UserObjectPermission, GroupObjectPermission
@@ -19,7 +18,7 @@ class ObjectPermissionTestCase(TestCase):
         self.group = Group.objects.get(name='jackGroup')
         UserObjectPermission.objects.all().delete()
         GroupObjectPermission.objects.all().delete()
-        self.flatpage = FlatPage.objects.create(title='Any page', url='/any/')
+        self.keycard = Keycard.objects.create()
 
 class ObjectPermissionCheckerTest(ObjectPermissionTestCase):
 
@@ -53,50 +52,50 @@ class ObjectPermissionCheckerTest(ObjectPermissionTestCase):
     def test_anonymous_user(self):
         user = AnonymousUser()
         check = ObjectPermissionChecker(user)
-        # assert anonymous user has no object permissions at all for flatpage
-        self.assertTrue( [] == list(check.get_perms(self.flatpage)) )
+        # assert anonymous user has no object permissions at all for keycard
+        self.assertTrue( [] == list(check.get_perms(self.keycard)) )
 
     def test_superuser(self):
         user = User.objects.create(username='superuser', is_superuser=True)
         check = ObjectPermissionChecker(user)
-        ctype = ContentType.objects.get_for_model(self.flatpage)
+        ctype = ContentType.objects.get_for_model(self.keycard)
         perms = sorted(chain(*Permission.objects
             .filter(content_type=ctype)
             .values_list('codename')))
-        self.assertEqual(perms, check.get_perms(self.flatpage))
+        self.assertEqual(perms, check.get_perms(self.keycard))
         for perm in perms:
-            self.assertTrue(check.has_perm(perm, self.flatpage))
+            self.assertTrue(check.has_perm(perm, self.keycard))
 
     def test_not_active_superuser(self):
         user = User.objects.create(username='not_active_superuser',
             is_superuser=True, is_active=False)
         check = ObjectPermissionChecker(user)
-        ctype = ContentType.objects.get_for_model(self.flatpage)
+        ctype = ContentType.objects.get_for_model(self.keycard)
         perms = sorted(chain(*Permission.objects
             .filter(content_type=ctype)
             .values_list('codename')))
-        self.assertEqual(check.get_perms(self.flatpage), [])
+        self.assertEqual(check.get_perms(self.keycard), [])
         for perm in perms:
-            self.assertFalse(check.has_perm(perm, self.flatpage))
+            self.assertFalse(check.has_perm(perm, self.keycard))
 
     def test_not_active_user(self):
         user = User.objects.create(username='notactive')
-        assign("change_flatpage", user, self.flatpage)
+        assign("change_keycard", user, self.keycard)
 
         # new ObjectPermissionChecker is created for each User.has_perm call
-        self.assertTrue(user.has_perm("change_flatpage", self.flatpage))
+        self.assertTrue(user.has_perm("change_keycard", self.keycard))
         user.is_active = False
-        self.assertFalse(user.has_perm("change_flatpage", self.flatpage))
+        self.assertFalse(user.has_perm("change_keycard", self.keycard))
 
         # use on one checker only (as user's is_active attr should be checked
         # before try to use cache
         user = User.objects.create(username='notactive-cache')
-        assign("change_flatpage", user, self.flatpage)
+        assign("change_keycard", user, self.keycard)
 
         check = ObjectPermissionChecker(user)
-        self.assertTrue(check.has_perm("change_flatpage", self.flatpage))
+        self.assertTrue(check.has_perm("change_keycard", self.keycard))
         user.is_active = False
-        self.assertFalse(check.has_perm("change_flatpage", self.flatpage))
+        self.assertFalse(check.has_perm("change_keycard", self.keycard))
 
     def test_get_perms(self):
         group = Group.objects.create(name='group')

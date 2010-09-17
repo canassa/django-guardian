@@ -1,9 +1,10 @@
 """
 Convenient shortcuts to manage or check object permissions.
 """
-from django.db import models
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.auth.models import Permission, User
+from django.contrib.auth.models import Permission, User, Group
+from django.db import models
+from django.db.models import Q
 
 from guardian.core import ObjectPermissionChecker
 from guardian.models import UserObjectPermission, GroupObjectPermission
@@ -94,15 +95,18 @@ def get_objs(cls, perm, user_or_group):
 
 def get_users_with_perm(obj, codename):
     ctype = ContentType.objects.get_for_model(obj)
-    group_perm_list = GroupObjectPermission.objects.filter(permission__codename=codename,
-                                                           content_type=ctype,
-                                                           object_id=obj.pk)
-    group_list = [group_perm.group for group_perm in group_perm_list]
-    user_perm_list = UserObjectPermission.objects.filter(permission__codename=codename,
-                                                         content_type=ctype,
-                                                         object_id=obj.pk)
-    user_list = [user_perm.user for user_perm in user_perm_list]
-    user_list2 = [user for user in User.objects.filter(groups__in=group_list)]
+    perm = Permission.objects.get(codename=codename, content_type=ctype)
 
-    return set(user_list2 + user_list)
+    # List with of users with the perm
+    users = UserObjectPermission.objects.filter(permission=perm,
+                                                content_type=ctype,
+                                                object_id=obj.pk).values('user')
+
+    # List of groups with the perm
+    groups = GroupObjectPermission.objects.filter(permission=perm,
+                                                  content_type=ctype,
+                                                  object_id=obj.pk).values('group')
+
+    user_list = User.objects.filter(Q(pk__in=users) | Q(groups__in=groups)).distinct()
+    return user_list
 

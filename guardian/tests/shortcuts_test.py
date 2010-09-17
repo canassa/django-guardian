@@ -3,7 +3,7 @@ from django.contrib.auth.models import User, Group, Permission
 
 from guardian.shortcuts import get_perms_for_model
 from guardian.core import ObjectPermissionChecker
-from guardian.shortcuts import assign, remove_perm, get_perms
+from guardian.shortcuts import assign, remove_perm, get_perms, get_users_with_perm
 from guardian.exceptions import NotUserNorGroup
 
 from guardian.tests.models import Keycard
@@ -39,20 +39,20 @@ class AssignTest(ObjectPermissionTestCase):
         self.assertRaises(NotUserNorGroup, assign,
             perm="change_object",
             user_or_group="Not a Model",
-            obj=self.flatpage)
+            obj=self.keycard)
 
     def test_user_assign(self):
-        assign("change_flatpage", self.user, self.flatpage)
-        assign("change_flatpage", self.group, self.flatpage)
-        self.assertTrue(self.user.has_perm("change_flatpage", self.flatpage))
+        assign("change_keycard", self.user, self.keycard)
+        assign("change_keycard", self.group, self.keycard)
+        self.assertTrue(self.user.has_perm("change_keycard", self.keycard))
 
     def test_group_assing(self):
-        assign("change_flatpage", self.group, self.flatpage)
-        assign("delete_flatpage", self.group, self.flatpage)
+        assign("change_keycard", self.group, self.keycard)
+        assign("delete_keycard", self.group, self.keycard)
 
         check = ObjectPermissionChecker(self.group)
-        self.assertTrue(check.has_perm("change_flatpage", self.flatpage))
-        self.assertTrue(check.has_perm("delete_flatpage", self.flatpage))
+        self.assertTrue(check.has_perm("change_keycard", self.keycard))
+        self.assertTrue(check.has_perm("delete_keycard", self.keycard))
 
 class RemovePermTest(ObjectPermissionTestCase):
     """
@@ -62,21 +62,21 @@ class RemovePermTest(ObjectPermissionTestCase):
         self.assertRaises(NotUserNorGroup, remove_perm,
             perm="change_object",
             user_or_group="Not a Model",
-            obj=self.flatpage)
+            obj=self.keycard)
 
     def test_user_remove_perm(self):
         # assign perm first
-        assign("change_flatpage", self.user, self.flatpage)
-        remove_perm("change_flatpage", self.user, self.flatpage)
-        self.assertFalse(self.user.has_perm("change_flatpage", self.flatpage))
+        assign("change_keycard", self.user, self.keycard)
+        remove_perm("change_keycard", self.user, self.keycard)
+        self.assertFalse(self.user.has_perm("change_keycard", self.keycard))
 
     def test_group_remove_perm(self):
         # assign perm first
-        assign("change_flatpage", self.group, self.flatpage)
-        remove_perm("change_flatpage", self.group, self.flatpage)
+        assign("change_keycard", self.group, self.keycard)
+        remove_perm("change_keycard", self.group, self.keycard)
 
         check = ObjectPermissionChecker(self.group)
-        self.assertFalse(check.has_perm("change_flatpage", self.flatpage))
+        self.assertFalse(check.has_perm("change_keycard", self.keycard))
 
 class GetPermsTest(ObjectPermissionTestCase):
     """
@@ -86,15 +86,46 @@ class GetPermsTest(ObjectPermissionTestCase):
     def test_not_model(self):
         self.assertRaises(NotUserNorGroup, get_perms,
             user_or_group=None,
-            obj=self.flatpage)
+            obj=self.keycard)
 
     def test_user(self):
-        perms_to_assign = ("change_flatpage",)
+        perms_to_assign = ("change_keycard",)
 
         for perm in perms_to_assign:
-            assign("change_flatpage", self.user, self.flatpage)
+            assign("change_keycard", self.user, self.keycard)
 
-        perms = get_perms(self.user, self.flatpage)
+        perms = get_perms(self.user, self.keycard)
         for perm in perms_to_assign:
             self.assertTrue(perm in perms)
+
+
+class GetUsersWithPerm(ObjectPermissionTestCase):
+    def test_get_users_with_perm(self):
+        users = list(get_users_with_perm(self.keycard, 'change_keycard').all())
+        self.assertEqual(users, [])
+
+        assign("change_keycard", self.group, self.keycard)
+        users = list(get_users_with_perm(self.keycard, 'change_keycard').all())
+        self.assertEqual(users, [self.user])
+
+        john = User.objects.create(username='John')
+        assign("add_keycard", john, self.keycard)
+        users = list(get_users_with_perm(self.keycard, 'change_keycard').all())
+        self.assertEqual(users, [self.user])
+
+        assign("change_keycard", john, self.keycard)
+        users = list(get_users_with_perm(self.keycard, 'change_keycard').all())
+        self.assertEqual(users.sort(), [self.user, john].sort())
+
+        mary = User.objects.create(username='Mary')
+        users = list(get_users_with_perm(self.keycard, 'change_keycard').all())
+        self.assertEqual(users.sort(), [self.user, john].sort())
+
+        mary.groups.add(self.group)
+        users = list(get_users_with_perm(self.keycard, 'change_keycard').all())
+        self.assertEqual(users.sort(), [self.user, john, mary].sort())
+
+        assign("change_keycard", mary, self.keycard)
+        users = list(get_users_with_perm(self.keycard, 'change_keycard').all())
+        self.assertEqual(users.sort(), [self.user, john, mary].sort())
 
