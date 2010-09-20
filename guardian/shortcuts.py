@@ -3,6 +3,7 @@ Convenient shortcuts to manage or check object permissions.
 """
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import Permission, User, Group
+from django.core.cache import cache
 from django.db import models
 from django.db.models import Q
 
@@ -95,18 +96,28 @@ def get_objs(cls, perm, user_or_group):
 
 def get_users_with_perm(obj, codename):
     ctype = ContentType.objects.get_for_model(obj)
-    perm = Permission.objects.get(codename=codename, content_type=ctype)
 
-    # List with of users with the perm
-    users = UserObjectPermission.objects.filter(permission=perm,
-                                                content_type=ctype,
-                                                object_id=obj.pk).values('user')
+    key = 'guardian.shortcuts.get_users_with_perm.{0}.{1}.{2}'.format(ctype.pk, obj.pk, codename)
+    user_list = cache.get(key)
+    if user_list is None:
+        perm = Permission.objects.get(codename=codename, content_type=ctype)
 
-    # List of groups with the perm
-    groups = GroupObjectPermission.objects.filter(permission=perm,
-                                                  content_type=ctype,
-                                                  object_id=obj.pk).values('group')
+        # List with of users with the perm
+        users = UserObjectPermission.objects.filter(permission=perm,
+                                                    content_type=ctype,
+                                                    object_id=obj.pk).values('user')
 
-    user_list = User.objects.filter(Q(pk__in=users) | Q(groups__in=groups)).distinct()
+        # List of groups with the perm
+        groups = GroupObjectPermission.objects.filter(permission=perm,
+                                                      content_type=ctype,
+                                                      object_id=obj.pk).values('group')
+
+        user_list = User.objects.filter(Q(pk__in=users) | Q(groups__in=groups)).distinct()
+        cache.set(key, user_list)
+        key_list = cache.get('guardian.keys', [])
+        if key not in key_list:
+            key_list.append(key)
+            cache.set('guardian.keys', key_list)
+
     return user_list
 
